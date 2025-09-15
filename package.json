@@ -6,10 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:status": "node scripts/db-manager.js status",
+    "db:cleanup": "node scripts/db-manager.js cleanup",
+    "db:reset": "node scripts/db-manager.js reset"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "clsx": "^2.1.0",
+    "dotenv": "^17.2.2",
     "framer-motion": "^11.0.3",
     "next": "^15.5.1-canary.11",
     "react": "^18.2.0",
@@ -24,6 +29,7 @@
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
     "postcss": "^8.4.35",
+    "supabase": "^2.40.7",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"
   }

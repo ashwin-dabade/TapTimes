@@ -16,6 +16,7 @@ function getRandomWords(count: number) {
 }
 
 interface NewsArticle {
+  id?: string;
   title: string;
   source: string;
   words: string[];
@@ -33,7 +34,16 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentArticle, setCurrentArticle] = useState<NewsArticle | null>(null);
+  const [viewedArticleIds, setViewedArticleIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load viewed article IDs from session storage on component mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem('viewedArticleIds');
+    if (stored) {
+      setViewedArticleIds(JSON.parse(stored));
+    }
+  }, []);
 
   // Start timer on first input
   useEffect(() => {
@@ -86,7 +96,9 @@ export default function Home() {
     setError(null);
     
     try {
-      const response = await fetch('/api/news');
+      // Include viewed article IDs in the request
+      const viewedParam = viewedArticleIds.length > 0 ? `?viewed=${viewedArticleIds.join(',')}` : '';
+      const response = await fetch(`/api/news${viewedParam}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -95,6 +107,13 @@ export default function Home() {
       
       setCurrentArticle(data);
       setWords(data.words);
+      
+      // Add this article ID to viewed articles if it has an ID
+      if (data.id) {
+        const newViewedIds = [...viewedArticleIds, data.id];
+        setViewedArticleIds(newViewedIds);
+        sessionStorage.setItem('viewedArticleIds', JSON.stringify(newViewedIds));
+      }
     } catch (err) {
       console.error('Error fetching news:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch news article');
@@ -133,6 +152,7 @@ export default function Home() {
     if (inputRef.current) inputRef.current.focus();
   };
 
+
   // Render the words with highlighting
   const renderWords = () => {
     const allChars = words.join(' ') + ' ';
@@ -157,6 +177,13 @@ export default function Home() {
     <main className="min-h-screen p-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-8">News Typing App</h1>
+        
+        {/* Statistics */}
+        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Articles viewed this session: {viewedArticleIds.length}
+          </p>
+        </div>
         
         {/* Article Info */}
         {currentArticle && (
