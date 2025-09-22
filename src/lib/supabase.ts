@@ -11,6 +11,7 @@ export interface Article {
   source: string
   url: string
   words: string[]
+  summary?: string
   created_at?: string
   expires_at?: string
 }

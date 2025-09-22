@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
+//const fetch = require('node-fetch');
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
@@ -107,16 +107,48 @@ async function resetDatabase() {
   }
 }
 
+async function summarizeWithClaude(text) {
+  const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+  if (!CLAUDE_API_KEY) throw new Error('Claude API key not set');
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: `Summarize the following article in 100 words:\n\n${text}`
+        }
+      ]
+    })
+  });
+  const data = await response.json();
+  if (data.content && Array.isArray(data.content) && data.content.length > 0) {
+    return data.content[0].text.trim();
+  }
+  throw new Error('Claude API did not return a summary');
+}
+
 async function addNewArticles() {
   const API_KEY = process.env.GUARDIAN_API_KEY;
   if (!API_KEY) {
     console.error('❌ Guardian API key not configured. Please add GUARDIAN_API_KEY to your .env.local file.');
     process.exit(1);
   }
-  console.log('⬇️  Preloading articles from The Guardian...');
+  if (!process.env.CLAUDE_API_KEY) {
+    console.error('❌ Claude API key not configured. Please add CLAUDE_API_KEY to your .env.local file.');
+    process.exit(1);
+  }
+  console.log('⬇️  Preloading articles from The Guardian and summarizing with Claude...');
   try {
     const response = await fetch(
-      `https://content.guardianapis.com/search?api-key=${API_KEY}&show-fields=body,headline,trailText&page-size=20&order-by=newest`,
+      `https://content.guardianapis.com/search?api-key=${API_KEY}&show-fields=body,headline,trailText&page-size=5&order-by=newest`,
       {
         headers: { 'User-Agent': 'News-Typing-App/1.0' },
       }
@@ -130,7 +162,7 @@ async function addNewArticles() {
     }
     let insertedCount = 0;
     for (const article of data.response.results) {
-      if (insertedCount >= 10) break;
+      if (insertedCount >= 5) break;
       // Check if this article URL already exists in database
       const { data: existingArticle } = await supabase
         .from('articles')
@@ -148,14 +180,21 @@ async function addNewArticles() {
         .replace(/&[a-zA-Z0-9#]+;/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-        .substring(0, 1000);
-      const words = cleanContent.split(' ').filter(word => word.length > 0).slice(0, 80);
-      if (words.length === 0) continue;
+        .substring(0, 4000);
+      if (cleanContent.length < 100) continue;
+      let summary;
+      try {
+        summary = await summarizeWithClaude(cleanContent);
+      } catch (e) {
+        console.error('Summarization failed:', e.message);
+        continue;
+      }
       const articleData = {
         title: article.fields?.headline || article.webTitle || 'Untitled',
         source: 'The Guardian',
-        words: words,
+        summary,
         url: article.webUrl,
+        words: summary.split(' '),
       };
       const { error: insertError } = await supabase
         .from('articles')
@@ -167,7 +206,7 @@ async function addNewArticles() {
       insertedCount++;
       console.log(`✅ Inserted: ${articleData.title}`);
     }
-    console.log(`\n🎉 Preloaded ${insertedCount} new articles.`);
+    console.log(`\n🎉 Preloaded ${insertedCount} new summarized articles.`);
   } catch (error) {
     console.error('❌ Error preloading articles:', error.message);
   }
