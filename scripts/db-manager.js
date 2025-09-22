@@ -107,6 +107,71 @@ async function resetDatabase() {
   }
 }
 
+async function addNewArticles() {
+  const API_KEY = process.env.GUARDIAN_API_KEY;
+  if (!API_KEY) {
+    console.error('❌ Guardian API key not configured. Please add GUARDIAN_API_KEY to your .env.local file.');
+    process.exit(1);
+  }
+  console.log('⬇️  Preloading articles from The Guardian...');
+  try {
+    const response = await fetch(
+      `https://content.guardianapis.com/search?api-key=${API_KEY}&show-fields=body,headline,trailText&page-size=20&order-by=newest`,
+      {
+        headers: { 'User-Agent': 'News-Typing-App/1.0' },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Guardian API request failed: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.response?.status !== 'ok' || !data.response?.results || data.response.results.length === 0) {
+      throw new Error('No articles found');
+    }
+    let insertedCount = 0;
+    for (const article of data.response.results) {
+      if (insertedCount >= 10) break;
+      // Check if this article URL already exists in database
+      const { data: existingArticle } = await supabase
+        .from('articles')
+        .select('id')
+        .eq('url', article.webUrl)
+        .single();
+      if (existingArticle) continue;
+      // Extract content
+      let content = '';
+      if (article.fields?.body) content = article.fields.body;
+      else if (article.fields?.trailText) content = article.fields.trailText;
+      else if (article.fields?.headline) content = article.fields.headline;
+      const cleanContent = content
+        .replace(/<[^>]*>/g, '')
+        .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 1000);
+      const words = cleanContent.split(' ').filter(word => word.length > 0).slice(0, 80);
+      if (words.length === 0) continue;
+      const articleData = {
+        title: article.fields?.headline || article.webTitle || 'Untitled',
+        source: 'The Guardian',
+        words: words,
+        url: article.webUrl,
+      };
+      const { error: insertError } = await supabase
+        .from('articles')
+        .insert([articleData]);
+      if (insertError) {
+        console.error('Error saving article to database:', insertError);
+        continue;
+      }
+      insertedCount++;
+      console.log(`✅ Inserted: ${articleData.title}`);
+    }
+    console.log(`\n🎉 Preloaded ${insertedCount} new articles.`);
+  } catch (error) {
+    console.error('❌ Error preloading articles:', error.message);
+  }
+}
 
 // Command line interface
 const command = process.argv[2];
@@ -121,6 +186,9 @@ switch (command) {
   case 'reset':
     resetDatabase();
     break;
+  case 'load':
+    addNewArticles();
+    break;
   default:
     console.log('🗄️  Database Manager');
     console.log('');
@@ -130,6 +198,7 @@ switch (command) {
     console.log('  status    - Check database status and statistics');
     console.log('  cleanup   - Delete expired articles');
     console.log('  reset     - Delete ALL articles (use with caution!)');
+    console.log('  preload   - Preload 10 articles from The Guardian API');
     console.log('');
     console.log('Examples:');
     console.log('  node scripts/db-manager.js status');

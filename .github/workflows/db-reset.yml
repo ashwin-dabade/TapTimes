@@ -1,8 +1,6 @@
-name: Database Automation
+name: Database Reset
 
 on:
-  schedule:
-    - cron: '0 0 * * *' # Runs every day at midnight UTC
   workflow_dispatch:
 
 jobs:
@@ -19,7 +17,7 @@ jobs:
       - run: npm install
 
       - name: Run DB Manager Script
-        run: node scripts/db-manager.js cleanup
+        run: node scripts/db-manager.js reset
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

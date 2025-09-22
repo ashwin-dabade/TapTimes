@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:status": "node scripts/db-manager.js status",
     "db:cleanup": "node scripts/db-manager.js cleanup",
-    "db:reset": "node scripts/db-manager.js reset"
+    "db:reset": "node scripts/db-manager.js reset",
+    "db:load": "node scripts/db-manager.js load"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
