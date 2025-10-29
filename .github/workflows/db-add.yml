@@ -1,24 +1,38 @@
-name: Database Add
+name: Database Add (Preload Articles)
 
 on:
   workflow_dispatch:
+  schedule:
+    # Run daily at 6 AM UTC to refresh articles
+    - cron: '0 6 * * *'
 
 jobs:
-  run-db-script:
+  preload-articles:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - run: npm install
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
 
-      - name: Run DB Manager Script
-        run: node scripts/db-manager.js load
+      - name: Preload articles to database
+        run: |
+          cd backend
+          python -c "
+          import asyncio
+          from main import preload_articles
+          result = asyncio.run(preload_articles())
+          print(f'Preload result: {result}')
+          "
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}

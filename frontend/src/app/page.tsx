@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { fetchNews } from '@/lib/api';
 
 // Fallback word list for when news API fails
 const FALLBACK_WORDS = [
@@ -94,20 +95,14 @@ export default function Home() {
   const fetchNewsArticle = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Include viewed article IDs in the request
-      const viewedParam = viewedArticleIds.length > 0 ? `?viewed=${viewedArticleIds.join(',')}` : '';
-      const response = await fetch(`/api/news${viewedParam}`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch news article');
-      }
-      
+      // Call the new API utility with viewed article IDs
+      const data = await fetchNews(viewedArticleIds);
+
       setCurrentArticle(data);
       setWords(data.words);
-      
+
       // Add this article ID to viewed articles if it has an ID
       if (data.id) {
         const newViewedIds = [...viewedArticleIds, data.id];

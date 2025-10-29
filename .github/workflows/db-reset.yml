@@ -4,20 +4,30 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-db-script:
+  reset-database:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - run: npm install
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
 
-      - name: Run DB Manager Script
-        run: node scripts/db-manager.js reset
+      - name: Reset database (delete all articles)
+        run: |
+          cd backend
+          python -c "
+          import asyncio
+          from main import db_reset
+          result = asyncio.run(db_reset())
+          print(f'Database reset: {result}')
+          "
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
