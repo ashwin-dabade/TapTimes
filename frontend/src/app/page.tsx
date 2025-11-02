@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { fetchNews } from '@/lib/api';
+import Auth from '@/components/Auth';
+import type { User } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // Fallback word list for when news API fails
 const FALLBACK_WORDS = [
@@ -25,6 +30,14 @@ interface NewsArticle {
 }
 
 export default function Home() {
+  // Auth state
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const supabase = createClient();
+  const router = useRouter();
+
+  // Typing state
   const [words, setWords] = useState<string[]>(() => getRandomWords(30));
   const [userInput, setUserInput] = useState('');
   const [isActive, setIsActive] = useState(false);
@@ -37,6 +50,27 @@ export default function Home() {
   const [currentArticle, setCurrentArticle] = useState<NewsArticle | null>(null);
   const [viewedArticleIds, setViewedArticleIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Check user session
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setAuthLoading(false);
+    };
+
+    getUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setShowAuthModal(false); // Close modal on successful auth
+      router.refresh();
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
 
   // Load viewed article IDs from session storage on component mount
   useEffect(() => {
@@ -75,15 +109,43 @@ export default function Home() {
     for (let i = 0; i < inputWords.length; i++) {
       if (inputWords[i] === words[i]) correctWords++;
     }
-    const wpm = Math.round((inputWords.length / 0.5) / 60 * 30); // 30s test
-    setWpm(wpm);
+    const calculatedWpm = Math.round((inputWords.length / 0.5) / 60 * 30);
+    setWpm(calculatedWpm);
     const totalChars = userInput.replace(/\s/g, '').length;
     let correctChars = 0;
     for (let i = 0; i < userInput.length; i++) {
       if (userInput[i] === (words.join(' ') + ' ')[i]) correctChars++;
     }
-    setAccuracy(totalChars === 0 ? 100 : Math.round((correctChars / totalChars) * 100));
+    const calculatedAccuracy = totalChars === 0 ? 100 : Math.round((correctChars / totalChars) * 100);
+    setAccuracy(calculatedAccuracy);
   };
+
+  // Save test results when finished (only for logged-in users)
+  const saveTestResult = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from('typing_tests').insert({
+        user_id: user.id,
+        article_id: currentArticle?.id || null,
+        wpm: wpm,
+        accuracy: accuracy,
+        time_spent: 30 - time,
+      });
+
+      if (error) throw error;
+      console.log('Test result saved!');
+    } catch (error) {
+      console.error('Error saving test result:', error);
+    }
+  };
+
+  // Call saveTestResult when test finishes
+  useEffect(() => {
+    if (finished && user && wpm > 0) {
+      saveTestResult();
+    }
+  }, [finished, user, wpm]);
 
   // Handle input
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,13 +159,11 @@ export default function Home() {
     setError(null);
 
     try {
-      // Call the new API utility with viewed article IDs
       const data = await fetchNews(viewedArticleIds);
 
       setCurrentArticle(data);
       setWords(data.words);
 
-      // Add this article ID to viewed articles if it has an ID
       if (data.id) {
         const newViewedIds = [...viewedArticleIds, data.id];
         setViewedArticleIds(newViewedIds);
@@ -112,7 +172,6 @@ export default function Home() {
     } catch (err) {
       console.error('Error fetching news:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch news article');
-      // Fallback to random words
       setWords(getRandomWords(30));
       setCurrentArticle(null);
     } finally {
@@ -147,6 +206,11 @@ export default function Home() {
     if (inputRef.current) inputRef.current.focus();
   };
 
+  // Handle sign out
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.refresh();
+  };
 
   // Render the words with highlighting
   const renderWords = () => {
@@ -158,7 +222,7 @@ export default function Home() {
           if (userInput.length > idx) {
             className = userInput[idx] === char ? 'text-green-600' : 'text-red-500';
           } else if (userInput.length === idx) {
-            className = 'bg-yellow-200'; // caret position
+            className = 'bg-yellow-200 dark:bg-yellow-600';
           }
           return (
             <span key={idx} className={className}>{char}</span>
@@ -168,90 +232,182 @@ export default function Home() {
     );
   };
 
+  // Loading state for auth
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  // Main typing interface (always shown)
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8">News Typing App</h1>
-        
-        {/* Statistics */}
-        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Articles viewed this session: {viewedArticleIds.length}
-          </p>
-        </div>
-        
-        {/* Article Info */}
-        {currentArticle && (
-          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <h2 className="font-semibold text-lg mb-2">{currentArticle.title}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Source: {currentArticle.source}
-            </p>
+    <>
+      <main className="min-h-screen p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold">News Typing App</h1>
+            <div className="flex gap-4">
+              {user ? (
+                <>
+                  <Link 
+                    href="/stats"
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    View Stats
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Sign In / Sign Up
+                </button>
+              )}
+            </div>
           </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-600 dark:text-red-400 text-sm">
-              {error}
-            </p>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
+          
+          {/* Guest Mode Info Banner (only show if not logged in) */}
+          {!user && (
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                💡 <strong>Try it out!</strong> You're using the app as a guest. 
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="ml-2 underline hover:text-blue-600 dark:hover:text-blue-300"
+                >
+                  Sign in to save your progress
+                </button>
+              </p>
+            </div>
+          )}
+          
+          {/* Statistics */}
           <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-            <p className="text-gray-600 dark:text-gray-400">Loading news article...</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Articles viewed this session: {viewedArticleIds.length}
+            </p>
           </div>
-        )}
+          
+          {/* Article Info */}
+          {currentArticle && (
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <h2 className="font-semibold text-lg mb-2">{currentArticle.title}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Source: {currentArticle.source}
+              </p>
+            </div>
+          )}
 
-        {renderWords()}
-        <input
-          ref={inputRef}
-          className="w-full p-2 border rounded font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          value={userInput}
-          onChange={handleInput}
-          disabled={finished || time === 0 || loading}
-          placeholder="Start typing to begin..."
-          autoFocus
-        />
-        <div className="flex justify-between items-center mb-4">
-          <div>Time: {time}s</div>
-          <div>WPM: {wpm}</div>
-          <div>Accuracy: {accuracy}%</div>
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="flex gap-4 justify-center mt-4">
-          <button 
-            className="button" 
-            onClick={handleNewArticle}
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : 'New Article'}
-          </button>
-          {finished && (
-            <button className="button" onClick={handleRestart}>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-600 dark:text-red-400 text-sm">
+                {error}
+              </p>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+              <p className="text-gray-600 dark:text-gray-400">Loading news article...</p>
+            </div>
+          )}
+
+          {renderWords()}
+          
+          <input
+            ref={inputRef}
+            className="w-full p-2 border rounded font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600"
+            value={userInput}
+            onChange={handleInput}
+            disabled={finished || time === 0 || loading}
+            placeholder="Start typing to begin..."
+            autoFocus
+          />
+          
+          <div className="flex justify-between items-center mb-4">
+            <div>Time: {time}s</div>
+            <div>WPM: {wpm}</div>
+            <div>Accuracy: {accuracy}%</div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex gap-4 justify-center mt-4">
+            <button 
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+              onClick={handleNewArticle}
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'New Article'}
+            </button>
+            <button 
+              className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              onClick={handleRestart}
+            >
               Restart
             </button>
+          </div>
+
+          {/* Results Display */}
+          {finished && (
+            <div className="mt-8 p-6 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+              <h2 className="text-2xl font-bold mb-4">Test Complete! ✅</h2>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">WPM</p>
+                  <p className="text-3xl font-bold">{wpm}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">Accuracy</p>
+                  <p className="text-3xl font-bold">{accuracy}%</p>
+                </div>
+              </div>
+              
+              {/* Show different messages based on user status */}
+              {!user ? (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                    💡 Want to track your progress over time?
+                  </p>
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Create an Account
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
+                  ✅ Result saved to your account!
+                </p>
+              )}
+            </div>
           )}
         </div>
+      </main>
 
-        {/* Article Link */}
-        {currentArticle && currentArticle.url && (
-          <div className="mt-4 text-center">
-            <a 
-              href={currentArticle.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-md w-full relative">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
             >
-              Read full article →
-            </a>
+              ×
+            </button>
+            <div className="p-6">
+              <Auth />
+            </div>
           </div>
-        )}
-      </div>
-    </main>
+        </div>
+      )}
+    </>
   );
-} 
+}
