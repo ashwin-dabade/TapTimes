@@ -13,11 +13,14 @@
     "db:load": "node scripts/db-manager.js load"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.78.0",
+    "@vercel/analytics": "^1.5.0",
     "clsx": "^2.1.0",
     "dotenv": "^17.2.2",
     "framer-motion": "^11.0.3",
     "next": "^15.5.1-canary.11",
+    "next-themes": "^0.4.6",
     "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

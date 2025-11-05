@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -9,15 +9,25 @@ from supabase import create_client, Client
 import anthropic
 import random
 import re
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from middleware.auth import require_auth
+from pydantic import BaseModel
 
 load_dotenv()
 
 app = FastAPI(title="News Typing API")
 
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update with your Vercel domain in production
+    allow_origins=["http://localhost:3000"],  # Your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,13 +36,15 @@ app.add_middleware(
 # Initialize clients
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_KEY")
+supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 guardian_api_key = os.getenv("GUARDIAN_API_KEY")
 claude_api_key = os.getenv("CLAUDE_API_KEY")
 
-if not all([supabase_url, supabase_key]):
+if not all([supabase_url, supabase_service_key]):
     raise ValueError("Missing required environment variables")
 
-supabase: Client = create_client(supabase_url, supabase_key)
+# Use service role key for backend operations
+supabase: Client = create_client(supabase_url, supabase_service_key)
 claude_client = anthropic.Anthropic(api_key=claude_api_key) if claude_api_key else None
 
 
@@ -266,6 +278,86 @@ async def preload_articles():
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Preload failed: {str(e)}")
+
+
+# Models
+class TestResult(BaseModel):
+    topic: str
+    article_title: str
+    wpm: int
+    accuracy: int
+    time: int
+
+
+# Auth-protected endpoints
+@app.get("/api/tests/history")
+async def get_test_history(user=Depends(require_auth)):
+    """Get authenticated user's test history"""
+    user_id = user.get("id")
+
+    result = supabase.table('typing_tests') \
+        .select('*') \
+        .eq('user_id', user_id) \
+        .order('completed_at', desc=True) \
+        .execute()
+
+    return {"tests": result.data}
+
+
+@app.get("/api/tests/stats")
+async def get_test_stats(user=Depends(require_auth)):
+    """Get authenticated user's statistics"""
+    user_id = user.get("id")
+
+    result = supabase.table('typing_tests') \
+        .select('wpm, accuracy, time') \
+        .eq('user_id', user_id) \
+        .execute()
+
+    tests = result.data
+
+    if not tests:
+        return {
+            "total_tests": 0,
+            "average_wpm": 0,
+            "average_accuracy": 0,
+            "total_time": 0
+        }
+
+    total_tests = len(tests)
+    total_wpm = sum(t['wpm'] for t in tests)
+    total_accuracy = sum(t['accuracy'] for t in tests)
+    total_time = sum(t['time'] for t in tests)
+
+    return {
+        "total_tests": total_tests,
+        "average_wpm": round(total_wpm / total_tests),
+        "average_accuracy": round(total_accuracy / total_tests),
+        "total_time": total_time
+    }
+
+
+@app.post("/api/tests")
+@limiter.limit("10/minute")  # Rate limit: 10 tests per minute
+async def save_test(
+    request: Request,
+    test_data: TestResult,
+    user=Depends(require_auth)
+):
+    """Save test result for authenticated user"""
+    user_id = user.get("id")
+
+    # Insert test with verified user_id from token
+    result = supabase.table('typing_tests').insert({
+        "user_id": user_id,
+        "topic": test_data.topic,
+        "article_title": test_data.article_title,
+        "wpm": test_data.wpm,
+        "accuracy": test_data.accuracy,
+        "time": test_data.time
+    }).execute()
+
+    return {"success": True, "test": result.data}
 
 
 if __name__ == "__main__":
