@@ -1,14 +1,11 @@
 "use client"
 
+import type { Score } from "@/lib/scoring"
+
 interface TestResultsProps {
-  results: {
-    wpm: number
-    accuracy: number
-    time: number
-  }
+  results: Score
   article: {
     title: string
-    content: string
   }
   onContinue: () => void
 }
@@ -35,6 +32,11 @@ export default function TestResults({ results, article, onContinue }: TestResult
           <p className="text-4xl font-bold text-primary">{results.time}s</p>
         </div>
       </div>
+
+      <p className="text-sm text-muted-foreground text-center">
+        {results.correctedErrors} fixed {results.correctedErrors === 1 ? "mistake" : "mistakes"} ·{" "}
+        {results.uncorrectedErrors} unfixed {results.uncorrectedErrors === 1 ? "mistake" : "mistakes"}
+      </p>
 
       <button
         onClick={onContinue}

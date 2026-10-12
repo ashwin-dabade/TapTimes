@@ -1,33 +1,26 @@
-name: Database Reset
+name: Database reset (delete all articles)
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "delete all articles" to confirm'
+        required: true
 
 jobs:
-  reset-database:
+  reset:
+    if: inputs.confirm == 'delete all articles'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install -r requirements.txt
+      - run: pip install -r ingest/requirements.txt
 
-      - name: Reset database (delete all articles)
-        run: |
-          cd backend
-          python -c "
-          import asyncio
-          from main import db_reset
-          result = asyncio.run(db_reset())
-          print(f'Database reset: {result}')
-          "
+      - run: python ingest/ingest.py --reset
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

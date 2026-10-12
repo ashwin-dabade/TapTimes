@@ -1,174 +1,79 @@
-# 🚀 News Typing App
+# Tap Times
 
-A modern, real-time typing practice application that uses live news articles to help you improve your typing speed and accuracy. Type along with current news content from The Guardian and track your progress!
+Typing practice with the news. Every night, a job pulls fresh articles, an LLM summarizes each one into plain prose, and users type those summaries while the app tracks WPM, accuracy, and which articles they've already seen.
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?style=for-the-badge&logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
-
-## ✨ Features
-
-- 📰 **Real News Content**: Practice typing with live articles from The Guardian
-- ⚡ **Real-time Feedback**: See your accuracy and speed as you type
-- 🎯 **Visual Highlighting**: Green for correct characters, red for mistakes
-- ⏱️ **30-Second Timer**: Quick, focused typing sessions
-- 📊 **Performance Metrics**: Track your WPM (Words Per Minute) and accuracy
-- 🔄 **Fallback Mode**: Uses curated word lists when news API is unavailable
-- 🌙 **Dark Mode Support**: Beautiful UI that adapts to your preference
-- 📱 **Responsive Design**: Works perfectly on desktop and mobile
-
-## 🎮 How It Works
-
-1. **Start Typing**: The timer begins when you start typing
-2. **Real-time Feedback**: Watch your characters turn green (correct) or red (incorrect)
-3. **Track Progress**: Monitor your WPM and accuracy in real-time
-4. **Get New Content**: Click "New Article" to fetch fresh news content
-5. **View Results**: See your final score when the timer ends
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- Guardian API key (optional, app works with fallback content)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ashwin-dabade/news-typing-app.git
-   cd news-typing-app
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Set up environment variables** (optional)
-   ```bash
-   cp .env.example .env.local
-   ```
-   Add your Guardian API key to `.env.local`:
-   ```
-   GUARDIAN_API_KEY=your_api_key_here
-   ```
-
-4. **Run the development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-5. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## 🔧 Configuration
-
-### Guardian API Setup (Optional)
-
-To use real news articles:
-
-1. Get a free API key from [The Guardian Open Platform](https://open-platform.theguardian.com/)
-2. Add it to your `.env.local` file:
-   ```
-   GUARDIAN_API_KEY=your_api_key_here
-   ```
-
-**Note**: The app works perfectly without an API key using fallback content!
-
-## 🛠️ Tech Stack
-
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **API**: Guardian News API
-- **Deployment**: Vercel-ready
-
-## 📁 Project Structure
+## Architecture ($0 to run)
 
 ```
-news-typing-app/
-├── src/
-│   ├── app/
-│   │   ├── api/news/          # News API endpoint
-│   │   ├── globals.css        # Global styles
-│   │   ├── layout.tsx         # App layout
-│   │   └── page.tsx           # Main typing interface
-│   └── lib/                   # Utility functions
-├── .gitignore                 # Git ignore rules
-├── package.json              # Dependencies
-├── tailwind.config.js        # Tailwind configuration
-└── tsconfig.json            # TypeScript configuration
+GitHub Actions (nightly cron)          Vercel (Next.js frontend)
+  ingest/ingest.py                        │  anon key + user session
+   ├─ Guardian API  → raw articles        ▼
+   ├─ Gemini / Groq → summaries      Supabase (Postgres + Auth)
+   └─ service-role key ─────────────▶  articles, typing_tests,
+                                       user_article_views, users
+                                       Row Level Security = access control
 ```
 
-## 🎯 Features in Detail
+There is no always-on backend server:
+- **Ingest** runs in GitHub Actions on a schedule. It writes with the service-role key.
+- **The browser** talks to Supabase directly with the anon key. Row Level Security policies limit each user to their own rows. Articles are public-read.
+- **Picking an article** goes through the Postgres function `get_next_article()`, which returns a random article the user hasn't seen yet.
 
-### Real-time Typing Analysis
-- Character-by-character accuracy tracking
-- Visual feedback with color-coded highlighting
-- Live WPM calculation
-- Real-time accuracy percentage
+## Repo layout
 
-### News Integration
-- Fetches fresh articles from The Guardian
-- Cleans and processes HTML content
-- Extracts meaningful text for typing practice
-- Graceful fallback to curated word lists
+| Path | What |
+|---|---|
+| `frontend/` | Next.js 15 app (deployed to Vercel) |
+| `ingest/` | Nightly Python job: `sources.py` (news APIs), `summarize.py` (LLM + rate limiting), `db.py` (Supabase REST), `ingest.py` (entry point) |
+| `supabase/migrations/` | Database schema, RLS policies, functions. Run in the Supabase SQL Editor |
+| `.github/workflows/ingest.yml` | Nightly cron at 06:00 UTC, plus a manual "Run workflow" button |
+| `.github/workflows/db-reset.yml` | Manual: delete all articles (asks for confirmation text) |
 
-### User Experience
-- Responsive design for all screen sizes
-- Keyboard-focused interface
-- Smooth animations and transitions
-- Accessible design patterns
+## Setup
 
-## 🚀 Deployment
+### 1. Supabase
+1. If the project was paused for inactivity, restore it from the dashboard.
+2. SQL Editor → paste and run `supabase/migrations/001_serverless_schema.sql`. It's safe to re-run, but note that it **replaces all existing RLS policies** on the four app tables.
+3. Settings → API: copy the project URL, the `anon` key, and the `service_role` key.
 
-### Vercel (Recommended)
+### 2. Frontend (Vercel)
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel, with the project root set to `frontend/`. For local dev:
+```bash
+cd frontend
+cp .env.example .env.local   # fill in values
+npm install
+npm run dev
+```
+In Supabase → Authentication → URL Configuration, add your Vercel URL and `http://localhost:3000` as redirect URLs.
 
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Add your `GUARDIAN_API_KEY` environment variable
-4. Deploy!
+### 3. Nightly ingest (GitHub Actions)
+Add these under repo Settings → Secrets and variables → Actions:
+- Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GUARDIAN_API_KEY`, `GEMINI_API_KEY` (free at aistudio.google.com), and optionally `GROQ_API_KEY`.
+- Variable (optional): `LLM_PROVIDER` = `gemini` (default) or `groq`.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ashwin-dabade/news-typing-app)
+Then go to the Actions tab → "Nightly article ingest" → **Run workflow** to test it. GitHub turns off scheduled workflows after 60 days of repo inactivity. If that happens, re-enable it from the same page.
 
-### Other Platforms
+Local run:
+```bash
+pip install -r ingest/requirements.txt
+cp ingest/.env.example ingest/.env   # fill in values
+python ingest/ingest.py
+```
 
-The app can be deployed to any platform that supports Next.js:
-- Netlify
-- Railway
-- DigitalOcean App Platform
-- AWS Amplify
+## Rate limits
+Summaries are made one at a time, at least `LLM_MIN_INTERVAL_SECONDS` apart (default 7s, about 8 per minute). A 429 response is retried with exponential backoff. Articles already in the database are skipped *before* the LLM is called, so re-runs don't use up quota. The default of 10 articles a night is far below free-tier daily limits.
 
-## 🤝 Contributing
+Models are set by env var. `GEMINI_MODEL` defaults to `gemini-flash-lite-latest`, an alias that follows Google's current model. `GROQ_MODEL` defaults to `openai/gpt-oss-20b`. If a provider retires a model, change the variable; no code change is needed.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Scoring
+Users can backspace to fix mistakes, but every wrong keystroke counts against them:
+- fixed mistake: −1 point; mistake left unfixed at the end: −2 points
+- `accuracy = (characters − penalty) / characters`
+- `WPM = (correct characters / 5) / minutes`
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+The weights are in `frontend/src/lib/scoring.ts`.
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [The Guardian](https://www.theguardian.com/) for providing the news API
-- [Next.js](https://nextjs.org/) for the amazing framework
-- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
-
-## 📞 Support
-
-If you have any questions or run into issues, please open an issue on GitHub.
-
----
-
-**Happy Typing! 🎯**
+## Roadmap
+- **Similar-article removal**: enable `pgvector`, have the ingest job store an embedding per article, and skip new articles whose cosine similarity to a recent one passes a threshold.
+- **More news sources**: add a `fetch_<source>()` to `ingest/sources.py` and include it in `fetch_all()`.
+- **Topics**: articles already store `section`; add a filter parameter to `get_next_article()`.

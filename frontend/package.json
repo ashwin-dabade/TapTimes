@@ -6,22 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "db:status": "node scripts/db-manager.js status",
-    "db:cleanup": "node scripts/db-manager.js cleanup",
-    "db:reset": "node scripts/db-manager.js reset",
-    "db:load": "node scripts/db-manager.js load"
+    "lint": "next lint"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.78.0",
     "@vercel/analytics": "^1.5.0",
     "clsx": "^2.1.0",
-    "dotenv": "^17.2.2",
     "framer-motion": "^11.0.3",
     "next": "^15.5.1-canary.11",
     "next-themes": "^0.4.6",
-    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.2.1"

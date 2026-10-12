@@ -15,5 +15,5 @@ export async function GET(request: Request) {
   }
 
   // Return to origin if there's an error
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  return NextResponse.redirect(`${origin}/sign-in`)
 }

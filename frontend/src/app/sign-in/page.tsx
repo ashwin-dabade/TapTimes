@@ -9,7 +9,7 @@ import Header from "@/components/header"
 import Link from "next/link"
 
 export default function SignInPage() {
-  const [usernameOrEmail, setUsernameOrEmail] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -22,16 +22,16 @@ export default function SignInPage() {
     setIsLoading(true)
 
     try {
-      if (!usernameOrEmail || !password) {
+      if (!email || !password) {
         setError("Please fill in all fields")
         setIsLoading(false)
         return
       }
 
-      signIn(usernameOrEmail, password)
+      await signIn(email, password)
       router.push("/")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid username/email or password")
+      setError(err instanceof Error ? err.message : "Invalid email or password")
     } finally {
       setIsLoading(false)
     }
@@ -56,15 +56,16 @@ export default function SignInPage() {
               )}
 
               <div className="space-y-2">
-                <label htmlFor="usernameOrEmail" className="block text-sm font-medium text-foreground">
-                  Username or Email
+                <label htmlFor="email" className="block text-sm font-medium text-foreground">
+                  Email
                 </label>
                 <input
-                  id="usernameOrEmail"
-                  type="text"
-                  placeholder="your_username or your@email.com"
-                  value={usernameOrEmail}
-                  onChange={(e) => setUsernameOrEmail(e.target.value)}
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled={isLoading}
                 />

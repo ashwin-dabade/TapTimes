@@ -14,6 +14,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { signUp } = useAuth()
   const router = useRouter()
@@ -54,10 +55,15 @@ export default function SignUpPage() {
         return
       }
 
-      signUp(email, username, password)
-      router.push("/")
+      const { session } = await signUp(email, username, password)
+      if (session) {
+        router.push("/")
+      } else {
+        // Email confirmation is on: no session until they click the link.
+        setNotice("Check your email for a confirmation link to finish signing up.")
+      }
     } catch (err) {
-      setError("An error occurred. Please try again.")
+      setError(err instanceof Error ? err.message : "An error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -78,6 +84,12 @@ export default function SignUpPage() {
               {error && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
                   {error}
+                </div>
+              )}
+
+              {notice && (
+                <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm text-foreground">
+                  {notice}
                 </div>
               )}
 

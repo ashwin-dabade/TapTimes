@@ -8,15 +8,11 @@ frontend/.vercel
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 
-# Backend
-backend/__pycache__/
-backend/*.py[cod]
-backend/*$py.class
-backend/venv/
-backend/env/
-backend/.env
-backend/.env.local
-backend/.railway/
+# Python (ingest job)
+__pycache__/
+*.py[cod]
+venv/
+.venv/
 
 # Testing
 .pytest_cache/

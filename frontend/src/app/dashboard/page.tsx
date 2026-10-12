@@ -36,27 +36,23 @@ export default function Dashboard() {
 
       try {
         setIsLoadingStats(true)
-        const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
+        // RLS limits this to the signed-in user's own tests.
+        const { data: tests, error } = await createClient()
+          .from("typing_tests")
+          .select("wpm, accuracy, time")
 
-        const response = await fetch('http://localhost:8000/api/tests/stats', {
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`
-          }
-        })
-
-        if (!response.ok) {
-          console.error('Error fetching stats')
-          setIsLoadingStats(false)
+        if (error) {
+          console.error("Error fetching stats:", error)
           return
         }
 
-        const statsData = await response.json()
+        const total = tests.length
+        const sum = (key: "wpm" | "accuracy" | "time") => tests.reduce((acc, t) => acc + t[key], 0)
         setStats({
-          totalTests: statsData.total_tests,
-          averageWPM: statsData.average_wpm,
-          averageAccuracy: statsData.average_accuracy,
-          totalTimeSpent: statsData.total_time,
+          totalTests: total,
+          averageWPM: total ? Math.round(sum("wpm") / total) : 0,
+          averageAccuracy: total ? Math.round(sum("accuracy") / total) : 0,
+          totalTimeSpent: sum("time"),
         })
       } catch (err) {
         console.error('Error fetching stats:', err)

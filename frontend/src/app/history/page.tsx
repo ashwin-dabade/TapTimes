@@ -5,22 +5,13 @@ import { useEffect, useState } from "react"
 import Header from "@/components/header"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import type { TypingTest } from "@/lib/supabase/types"
 
-interface Test {
-  id: string
-  user_id: string
-  topic: string
-  article_title: string
-  wpm: number
-  accuracy: number
-  time: number
-  completed_at: string
-}
 
 export default function History() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [tests, setTests] = useState<Test[]>([])
+  const [tests, setTests] = useState<TypingTest[]>([])
   const [isLoadingTests, setIsLoadingTests] = useState(false)
 
   useEffect(() => {
@@ -35,23 +26,18 @@ export default function History() {
 
       try {
         setIsLoadingTests(true)
-        const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
+        // RLS limits this to the signed-in user's own tests.
+        const { data, error } = await createClient()
+          .from("typing_tests")
+          .select("*")
+          .order("completed_at", { ascending: false })
 
-        const response = await fetch('http://localhost:8000/api/tests/history', {
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`
-          }
-        })
-
-        if (!response.ok) {
-          console.error('Error fetching tests')
-          setIsLoadingTests(false)
+        if (error) {
+          console.error("Error fetching tests:", error)
           return
         }
 
-        const data = await response.json()
-        setTests(data.tests || [])
+        setTests(data || [])
       } catch (err) {
         console.error('Error fetching tests:', err)
       } finally {
@@ -100,7 +86,8 @@ export default function History() {
                   <div>
                     <h3 className="text-lg font-semibold text-foreground">{test.article_title}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(test.completed_at).toLocaleDateString()} • <span className="capitalize">{test.topic}</span>
+                      {new Date(test.completed_at).toLocaleDateString()}
+                      {test.topic && <> • <span className="capitalize">{test.topic}</span></>}
                     </p>
                   </div>
                 </div>
