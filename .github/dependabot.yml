@@ -1,25 +1,40 @@
-# Opens weekly PRs to update dependencies; CI checks each one before you merge.
+# Routine dependency updates: one grouped PR per ecosystem, once a month.
+# Major versions are ignored here; upgrade those deliberately as planned tasks
+# (check `npm outdated` / `pip list --outdated` when you want to).
+# Vulnerability fixes come separately via Dependabot security updates
+# (repo Settings -> Code security).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
-    # Bundle minor/patch bumps into one PR to keep the noise down.
+      interval: monthly
     groups:
-      minor-and-patch:
+      npm-minor-and-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
-    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: pip
     directory: /ingest
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
-      minor-and-patch:
+      pip-minor-and-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
+  # Actions release new majors (v4 -> v5) as their normal update path and
+  # rarely break anything, so majors are allowed here, grouped into one PR.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
