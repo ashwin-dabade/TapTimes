@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/use-auth"
 import { useEffect, useState } from "react"
 import Header from "@/components/header"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { TypingTest } from "@/lib/supabase/types"
@@ -71,12 +72,12 @@ export default function History() {
         {tests.length === 0 ? (
           <div className="bg-card border border-border rounded-lg p-8 text-center">
             <p className="text-muted-foreground mb-4">No tests completed yet</p>
-            <a
+            <Link
               href="/"
               className="inline-block bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:opacity-90 transition"
             >
               Start Your First Test
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-4">

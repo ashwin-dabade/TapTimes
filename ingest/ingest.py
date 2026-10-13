@@ -8,9 +8,10 @@ Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GUARDIAN_API_KEY,
      LLM_PROVIDER (gemini|groq) + GEMINI_API_KEY or GROQ_API_KEY.
 Optional: ARTICLES_PER_RUN (default 10), ARTICLE_TTL_DAYS (default 7).
 """
+
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import db
@@ -49,7 +50,7 @@ def run() -> int:
         print("Nothing new to add")
         return 0
 
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=ARTICLE_TTL_DAYS)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(days=ARTICLE_TTL_DAYS)).isoformat()
     rows = []
     for article in fresh:
         try:
@@ -57,7 +58,7 @@ def run() -> int:
         except summarize.RateLimitedError as e:
             print(f"Stopping early: {e}")
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - one bad article must not stop the run
             print(f"  Skipped {article.title!r}: {e}")
             continue
         print(f"  Summarized ({len(summary.split())} words): {article.title}")

@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/use-auth"
 import { useEffect, useState } from "react"
 import Header from "@/components/header"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -103,12 +104,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <a
+        <Link
           href="/"
           className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
         >
           Practice More
-        </a>
+        </Link>
       </main>
     </div>
   )
