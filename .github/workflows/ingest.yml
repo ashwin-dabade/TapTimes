@@ -3,9 +3,12 @@ name: Nightly article ingest
 on:
   workflow_dispatch:
   schedule:
-    # 06:00 UTC daily. GitHub may delay scheduled runs, and disables them after
-    # 60 days without repo activity (re-enable from the Actions tab).
-    - cron: '0 6 * * *'
+    # 09:17 UTC daily (5:17 AM EDT / 4:17 AM EST): after the UK morning news,
+    # before US mornings. Off the top of the hour on purpose: GitHub delays or
+    # even drops scheduled runs at busy times like :00.
+    # GitHub also disables schedules after 60 days without repo activity
+    # (re-enable from the Actions tab).
+    - cron: '17 9 * * *'
 
 jobs:
   ingest:
