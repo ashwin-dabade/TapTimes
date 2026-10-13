@@ -1,8 +1,8 @@
 """News sources. Each source returns a list of RawArticle; add new APIs here."""
+
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 import httpx
 
@@ -13,8 +13,8 @@ class RawArticle:
     title: str
     source: str
     url: str
-    section: Optional[str]
-    published_at: Optional[str]
+    section: str | None
+    published_at: str | None
     body: str
 
 
@@ -25,7 +25,7 @@ def clean_html(content: str) -> str:
     return " ".join(text.split())
 
 
-def fetch_guardian(page_size: int = 30) -> List[RawArticle]:
+def fetch_guardian(page_size: int = 30) -> list[RawArticle]:
     api_key = os.environ["GUARDIAN_API_KEY"]
     response = httpx.get(
         "https://content.guardianapis.com/search",
@@ -41,7 +41,7 @@ def fetch_guardian(page_size: int = 30) -> List[RawArticle]:
     )
     response.raise_for_status()
 
-    articles: List[RawArticle] = []
+    articles: list[RawArticle] = []
     for item in response.json().get("response", {}).get("results", []):
         fields = item.get("fields", {})
         body = clean_html(fields.get("body") or fields.get("trailText") or "")
@@ -62,6 +62,6 @@ def fetch_guardian(page_size: int = 30) -> List[RawArticle]:
     return articles
 
 
-def fetch_all() -> List[RawArticle]:
+def fetch_all() -> list[RawArticle]:
     """Every configured source, newest first per source."""
     return fetch_guardian()

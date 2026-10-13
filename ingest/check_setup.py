@@ -8,6 +8,7 @@ Reads ingest/.env. Add SUPABASE_ANON_KEY there to also verify that Row Level
 Security blocks anonymous access the way the frontend relies on.
 Read-only except for the single LLM request.
 """
+
 import os
 import sys
 
@@ -23,7 +24,7 @@ def check(name):
         try:
             detail = fn()
             results.append((True, name, detail or ""))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - report any failure as FAIL
             results.append((False, name, str(e)[:300]))
         return fn
 
@@ -60,7 +61,9 @@ def main() -> int:
             if r.status_code in (401, 403):
                 raise RuntimeError(f"{r.status_code}: key rejected. Is it the service_role key? {r.text}")
             r.raise_for_status()
-            total = c.get("/articles", params={"select": "id"}, headers={"Prefer": "count=exact", "Range": "0-0"})
+            total = c.get(
+                "/articles", params={"select": "id"}, headers={"Prefer": "count=exact", "Range": "0-0"}
+            )
             return f"articles in table: {total.headers.get('content-range', '?').split('/')[-1]}"
 
     @check("Migration applied (new columns + tables)")
@@ -74,7 +77,9 @@ def main() -> int:
             ]:
                 r = c.get(f"/{table}", params={"select": cols, "limit": 1})
                 if r.status_code != 200:
-                    raise RuntimeError(f"{table}: {r.text} -> run supabase/migrations/001_serverless_schema.sql")
+                    raise RuntimeError(
+                        f"{table}: {r.text} -> run supabase/migrations/001_serverless_schema.sql"
+                    )
 
     @check("Function get_next_article()")
     def _():
@@ -83,7 +88,11 @@ def main() -> int:
             if r.status_code != 200:
                 raise RuntimeError(r.text)
             rows = r.json()
-            return f"returned: {rows[0]['title']!r}" if rows else "works, but no unexpired articles (run seed.py)"
+            return (
+                f"returned: {rows[0]['title']!r}"
+                if rows
+                else "works, but no unexpired articles (run seed.py)"
+            )
 
     @check("Function username_available()")
     def _():
@@ -123,7 +132,11 @@ def main() -> int:
         import sources
 
         articles = sources.fetch_guardian(page_size=5)
-        return f"{len(articles)} usable articles, e.g. {articles[0].title!r}" if articles else "0 usable articles"
+        return (
+            f"{len(articles)} usable articles, e.g. {articles[0].title!r}"
+            if articles
+            else "0 usable articles"
+        )
 
     if skip_llm:
         results.append((None, "LLM summary", "skipped (--no-llm)"))

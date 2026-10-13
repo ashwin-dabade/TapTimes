@@ -4,6 +4,7 @@ LLM_PROVIDER selects the backend (gemini | groq). Calls are spaced at least
 LLM_MIN_INTERVAL_SECONDS apart, and rate-limit (429) or transient 5xx errors
 are retried with exponential backoff, honoring Retry-After when given.
 """
+
 import os
 import random
 import re
@@ -89,8 +90,14 @@ _BACKENDS = {
 
 # Map typographic characters to what a keyboard can type.
 _REPLACEMENTS = {
-    "‘": "'", "’": "'", "“": '"', "”": '"',
-    "–": "-", "—": " - ", "…": "...", " ": " ",
+    "‘": "'",
+    "’": "'",
+    "“": '"',
+    "”": '"',
+    "–": "-",
+    "—": " - ",
+    "…": "...",
+    " ": " ",
 }
 
 
@@ -117,7 +124,7 @@ def summarize(title: str, body: str, min_words: int = 100, max_words: int = 150)
             return text
         if response.status_code == 429 or response.status_code >= 500:
             retry_after = response.headers.get("retry-after")
-            delay = float(retry_after) if retry_after and retry_after.isdigit() else 2 ** attempt * 5
+            delay = float(retry_after) if retry_after and retry_after.isdigit() else 2**attempt * 5
             delay += random.uniform(0, 2)
             print(f"  {PROVIDER} returned {response.status_code}; retrying in {delay:.0f}s")
             time.sleep(delay)

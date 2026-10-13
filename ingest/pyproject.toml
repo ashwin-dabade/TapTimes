@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Modules import each other by name (`import db`), so put ingest/ on the path.
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# Defaults plus import sorting and common bug patterns.
+extend-select = ["I", "B", "UP"]

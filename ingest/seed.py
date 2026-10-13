@@ -4,8 +4,9 @@ Usage:
     python ingest/seed.py            # add sample articles (safe to re-run)
     python ingest/seed.py --remove   # delete only the sample articles
 """
+
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import db
 from ingest import load_dotenv
@@ -64,7 +65,7 @@ SAMPLES = [
 
 
 def rows() -> list:
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(days=7)).isoformat()
     return [
         {
             "external_id": f"seed:{i}",

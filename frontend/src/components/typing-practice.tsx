@@ -175,7 +175,7 @@ export default function TypingPractice() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
-          <p className="text-foreground text-lg font-medium">You're all caught up!</p>
+          <p className="text-foreground text-lg font-medium">You&apos;re all caught up!</p>
           <p className="text-muted-foreground">New articles arrive every night.</p>
           <button
             onClick={() => fetchArticle(true)}

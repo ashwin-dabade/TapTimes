@@ -3,8 +3,9 @@
 Plain httpx instead of the supabase SDK: one small dependency, no version
 conflicts like the ones that broke the old Railway build.
 """
+
 import os
-from typing import Iterable, List, Set
+from collections.abc import Iterable
 
 import httpx
 
@@ -19,20 +20,18 @@ def _client() -> httpx.Client:
     )
 
 
-def existing_external_ids(ids: Iterable[str]) -> Set[str]:
+def existing_external_ids(ids: Iterable[str]) -> set[str]:
     ids = list(ids)
     if not ids:
         return set()
     quoted = ",".join('"' + i.replace('"', '\\"') + '"' for i in ids)
     with _client() as client:
-        response = client.get(
-            "/articles", params={"select": "external_id", "external_id": f"in.({quoted})"}
-        )
+        response = client.get("/articles", params={"select": "external_id", "external_id": f"in.({quoted})"})
         response.raise_for_status()
         return {row["external_id"] for row in response.json()}
 
 
-def insert_articles(rows: List[dict]) -> int:
+def insert_articles(rows: list[dict]) -> int:
     if not rows:
         return 0
     with _client() as client:
